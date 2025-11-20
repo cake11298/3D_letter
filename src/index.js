@@ -48,6 +48,9 @@ class Letter3D {
         this.camera = null;
         this.renderer = null;
         this.document = null;
+        this.isDragging = false;
+        this.previousMousePosition = { x: 0, y: 0 };
+        this.particles = null;
 
         this.init();
     }
@@ -56,6 +59,7 @@ class Letter3D {
         this.setupScene();
         this.setupLights();
         this.createDocument();
+        this.createAmbientElements();
         this.setupEventListeners();
         this.animate();
 
@@ -66,19 +70,19 @@ class Letter3D {
     }
 
     setupScene() {
-        // Scene with warm dark background
+        // Scene with dark background
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x1a1410);
-        this.scene.fog = new THREE.Fog(0x1a1410, 8, 30);
+        this.scene.background = new THREE.Color(0x0a0a0a);
+        this.scene.fog = new THREE.Fog(0x0a0a0a, 10, 50);
 
-        // Camera - slightly closer for letter viewing
+        // Camera
         this.camera = new THREE.PerspectiveCamera(
-            45,
+            50,
             window.innerWidth / window.innerHeight,
             0.1,
             1000
         );
-        this.camera.position.set(0, 0.5, 7);
+        this.camera.position.set(0, 2, 8);
         this.camera.lookAt(0, 0, 0);
 
         // Renderer
@@ -91,64 +95,63 @@ class Letter3D {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.0;
+        this.renderer.toneMappingExposure = 1.2;
 
         document.getElementById('canvas-container').appendChild(this.renderer.domElement);
     }
 
     setupLights() {
-        // Very dim ambient light - creates the spotlight focus effect
-        const ambient = new THREE.AmbientLight(0xfff5e6, 0.15);
+        // Ambient light - slightly brighter for paper visibility
+        const ambient = new THREE.AmbientLight(0xfff5e6, 0.4);
         this.scene.add(ambient);
 
-        // Main spotlight - warm focused light on the letter
-        const mainSpotlight = new THREE.SpotLight(0xfff8e7, 3);
-        mainSpotlight.position.set(0, 6, 5);
-        mainSpotlight.angle = Math.PI / 6; // Narrower angle for focused spotlight
-        mainSpotlight.penumbra = 0.7; // Soft edges
+        // Main spotlight - bright warm light on the paper
+        const mainSpotlight = new THREE.SpotLight(0xfff8e7, 4);
+        mainSpotlight.position.set(0, 5, 8);
+        mainSpotlight.angle = Math.PI / 4;
+        mainSpotlight.penumbra = 0.5;
         mainSpotlight.decay = 1.5;
-        mainSpotlight.distance = 20;
+        mainSpotlight.distance = 30;
         mainSpotlight.castShadow = true;
         mainSpotlight.shadow.mapSize.width = 2048;
         mainSpotlight.shadow.mapSize.height = 2048;
-        mainSpotlight.shadow.bias = -0.0001;
         this.scene.add(mainSpotlight);
 
-        // Secondary spotlight from above - adds depth
-        const topSpotlight = new THREE.SpotLight(0xffe4c4, 1.5);
-        topSpotlight.position.set(0, 8, 0);
-        topSpotlight.angle = Math.PI / 5;
-        topSpotlight.penumbra = 0.8;
-        topSpotlight.decay = 2;
-        topSpotlight.distance = 15;
-        this.scene.add(topSpotlight);
+        // Top spotlight for even illumination
+        const topLight = new THREE.SpotLight(0xffeedd, 2);
+        topLight.position.set(0, 8, 2);
+        topLight.angle = Math.PI / 5;
+        topLight.penumbra = 0.8;
+        topLight.decay = 2;
+        topLight.distance = 20;
+        this.scene.add(topLight);
 
-        // Subtle warm rim light
-        const rimLight = new THREE.DirectionalLight(0xffd4a3, 0.3);
-        rimLight.position.set(-3, 2, -3);
+        // Warm rim light
+        const rimLight = new THREE.DirectionalLight(0xffd4a3, 0.6);
+        rimLight.position.set(-5, 3, -5);
         this.scene.add(rimLight);
 
-        // Very subtle accent light for warmth
-        const accentLight = new THREE.PointLight(0xffaa77, 0.5, 8);
-        accentLight.position.set(2, 1, 2);
+        // Accent light for warmth
+        const accentLight = new THREE.PointLight(0xffaa77, 0.8, 10);
+        accentLight.position.set(3, 2, 3);
         this.scene.add(accentLight);
     }
 
     createDocument() {
         const docGroup = new THREE.Group();
 
-        // Create paper stack (fewer pages for a letter)
-        const pageCount = 15;
-        const pageThickness = 0.008;
+        // Create paper stack
+        const pageCount = 30;
+        const pageThickness = 0.01;
 
         for (let i = 0; i < pageCount; i++) {
             const geometry = new THREE.BoxGeometry(4, 5.5, pageThickness);
             const material = new THREE.MeshStandardMaterial({
-                color: 0xfaf6f0,
-                roughness: 0.8,
-                metalness: 0.05,
-                emissive: 0x332211,
-                emissiveIntensity: 0.02
+                color: 0xf5f5f0,
+                roughness: 0.7,
+                metalness: 0.1,
+                emissive: 0x111111,
+                emissiveIntensity: 0.1
             });
 
             const page = new THREE.Mesh(geometry, material);
@@ -156,8 +159,8 @@ class Letter3D {
             page.castShadow = true;
             page.receiveShadow = true;
 
-            // Slight variation for realism
-            page.rotation.y = (Math.random() - 0.5) * 0.003;
+            // Add slight variation
+            page.rotation.y = (Math.random() - 0.5) * 0.005;
 
             docGroup.add(page);
         }
@@ -167,9 +170,9 @@ class Letter3D {
         this.frontPage.position.z = pageCount * pageThickness + 0.01;
         docGroup.add(this.frontPage);
 
-        // Position document - centered and slightly tilted for reading
+        // Position document
         docGroup.position.z = -(pageCount * pageThickness) / 2;
-        docGroup.rotation.x = -0.05; // Very slight tilt
+        docGroup.rotation.x = -0.1;
 
         this.scene.add(docGroup);
         this.document = docGroup;
@@ -182,17 +185,16 @@ class Letter3D {
         canvas.height = 1400;
         const ctx = canvas.getContext('2d');
 
-        // Warm paper background
+        // Background with subtle gradient
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#fffef9');
-        gradient.addColorStop(0.5, '#fefcf5');
-        gradient.addColorStop(1, '#faf6f0');
+        gradient.addColorStop(0, '#ffffff');
+        gradient.addColorStop(1, '#f8f8f8');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Paper texture - subtle noise
-        ctx.fillStyle = 'rgba(139, 119, 101, 0.015)';
-        for (let i = 0; i < 2000; i++) {
+        // Paper texture
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.02)';
+        for (let i = 0; i < 3000; i++) {
             ctx.fillRect(
                 Math.random() * canvas.width,
                 Math.random() * canvas.height,
@@ -200,31 +202,25 @@ class Letter3D {
             );
         }
 
-        // Decorative top border - warm elegant line
-        const borderGradient = ctx.createLinearGradient(100, 0, canvas.width - 100, 0);
-        borderGradient.addColorStop(0, 'rgba(212, 165, 116, 0)');
-        borderGradient.addColorStop(0.3, 'rgba(212, 165, 116, 0.6)');
-        borderGradient.addColorStop(0.5, 'rgba(212, 165, 116, 0.8)');
-        borderGradient.addColorStop(0.7, 'rgba(212, 165, 116, 0.6)');
-        borderGradient.addColorStop(1, 'rgba(212, 165, 116, 0)');
-        ctx.fillStyle = borderGradient;
-        ctx.fillRect(100, 40, canvas.width - 200, 3);
+        // Decorative header bar - warm gold
+        ctx.fillStyle = letterContent.color;
+        ctx.fillRect(0, 0, canvas.width, 15);
 
         // Title
         ctx.fillStyle = letterContent.color;
         ctx.font = 'bold 42px "Microsoft JhengHei", "PingFang TC", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(letterContent.title, canvas.width / 2, 100);
+        ctx.fillText(letterContent.title, canvas.width / 2, 80);
 
         // Letter content
-        ctx.fillStyle = '#3a3330';
+        ctx.fillStyle = '#1a1a1a';
         ctx.font = '26px "Microsoft JhengHei", "PingFang TC", sans-serif';
         ctx.textAlign = 'left';
 
         const margin = 80;
         const maxWidth = canvas.width - margin * 2;
         const lineHeight = 38;
-        let y = 160;
+        let y = 130;
 
         letterContent.sections.forEach((section, index) => {
             const lines = section.text.split('\n');
@@ -261,10 +257,6 @@ class Letter3D {
             }
         });
 
-        // Bottom decorative line
-        ctx.fillStyle = borderGradient;
-        ctx.fillRect(100, canvas.height - 50, canvas.width - 200, 2);
-
         // Create texture and material
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
@@ -273,10 +265,10 @@ class Letter3D {
         const geometry = new THREE.BoxGeometry(4, 5.5, 0.01);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
-            roughness: 0.7,
-            metalness: 0.02,
-            emissive: 0x221100,
-            emissiveIntensity: 0.02
+            roughness: 0.6,
+            metalness: 0.05,
+            emissive: 0x222222,
+            emissiveIntensity: 0.05
         });
 
         const mesh = new THREE.Mesh(geometry, material);
@@ -284,6 +276,64 @@ class Letter3D {
         mesh.receiveShadow = true;
 
         return mesh;
+    }
+
+    createAmbientElements() {
+        // Create floating particles for warm atmosphere
+        const particleCount = 50;
+        const positions = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+
+        for (let i = 0; i < particleCount; i++) {
+            // Spread particles around but not in front of the paper
+            positions[i * 3] = (Math.random() - 0.5) * 20;
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 15 - 5; // Behind and around
+
+            sizes[i] = Math.random() * 0.05 + 0.02;
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+        const material = new THREE.PointsMaterial({
+            color: 0xffd4a3,
+            size: 0.05,
+            transparent: true,
+            opacity: 0.4,
+            blending: THREE.AdditiveBlending,
+            sizeAttenuation: true
+        });
+
+        this.particles = new THREE.Points(geometry, material);
+        this.scene.add(this.particles);
+
+        // Add subtle glowing orbs in the background
+        for (let i = 0; i < 5; i++) {
+            const orbGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+            const orbMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffaa66,
+                transparent: true,
+                opacity: 0.15
+            });
+            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+
+            // Position orbs around the scene but not blocking the paper
+            orb.position.set(
+                (Math.random() - 0.5) * 12,
+                (Math.random() - 0.5) * 6,
+                -3 - Math.random() * 5
+            );
+
+            orb.userData = {
+                originalY: orb.position.y,
+                speed: 0.3 + Math.random() * 0.3,
+                amplitude: 0.2 + Math.random() * 0.3
+            };
+
+            this.scene.add(orb);
+        }
     }
 
     setupEventListeners() {
@@ -294,16 +344,99 @@ class Letter3D {
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Set default cursor
-        this.renderer.domElement.style.cursor = 'default';
+        // Mouse controls for drag rotation
+        this.renderer.domElement.addEventListener('mousedown', (event) => {
+            this.isDragging = true;
+            this.previousMousePosition = { x: event.clientX, y: event.clientY };
+        });
+
+        this.renderer.domElement.addEventListener('mousemove', (event) => {
+            if (this.isDragging) {
+                const deltaX = event.clientX - this.previousMousePosition.x;
+                const deltaY = event.clientY - this.previousMousePosition.y;
+
+                this.document.rotation.y += deltaX * 0.005;
+                this.document.rotation.x += deltaY * 0.005;
+
+                // Clamp rotation
+                this.document.rotation.x = Math.max(-0.5, Math.min(0.5, this.document.rotation.x));
+
+                this.previousMousePosition = { x: event.clientX, y: event.clientY };
+            }
+
+            this.renderer.domElement.style.cursor = this.isDragging ? 'grabbing' : 'grab';
+        });
+
+        this.renderer.domElement.addEventListener('mouseup', () => {
+            this.isDragging = false;
+            this.renderer.domElement.style.cursor = 'grab';
+        });
+
+        this.renderer.domElement.addEventListener('mouseleave', () => {
+            this.isDragging = false;
+        });
+
+        // Touch support for mobile
+        this.renderer.domElement.addEventListener('touchstart', (event) => {
+            this.isDragging = true;
+            this.previousMousePosition = {
+                x: event.touches[0].clientX,
+                y: event.touches[0].clientY
+            };
+        });
+
+        this.renderer.domElement.addEventListener('touchmove', (event) => {
+            if (this.isDragging) {
+                const deltaX = event.touches[0].clientX - this.previousMousePosition.x;
+                const deltaY = event.touches[0].clientY - this.previousMousePosition.y;
+
+                this.document.rotation.y += deltaX * 0.005;
+                this.document.rotation.x += deltaY * 0.005;
+
+                this.document.rotation.x = Math.max(-0.5, Math.min(0.5, this.document.rotation.x));
+
+                this.previousMousePosition = {
+                    x: event.touches[0].clientX,
+                    y: event.touches[0].clientY
+                };
+            }
+        });
+
+        this.renderer.domElement.addEventListener('touchend', () => {
+            this.isDragging = false;
+        });
+
+        // Set initial cursor
+        this.renderer.domElement.style.cursor = 'grab';
     }
 
     animate() {
         requestAnimationFrame(() => this.animate());
 
-        // Very subtle floating animation - gentle breathing effect
-        const time = Date.now() * 0.0003;
-        this.document.position.y = Math.sin(time) * 0.02;
+        const time = Date.now() * 0.001;
+
+        // Subtle floating animation (only when not dragging)
+        if (!this.isDragging) {
+            this.document.position.y = Math.sin(time * 0.5) * 0.05;
+        }
+
+        // Animate particles
+        if (this.particles) {
+            this.particles.rotation.y = time * 0.02;
+            const positions = this.particles.geometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i + 1] += Math.sin(time + i) * 0.001;
+            }
+            this.particles.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Animate background orbs
+        this.scene.children.forEach(child => {
+            if (child.userData && child.userData.originalY !== undefined) {
+                child.position.y = child.userData.originalY +
+                    Math.sin(time * child.userData.speed) * child.userData.amplitude;
+            }
+        });
 
         this.renderer.render(this.scene, this.camera);
     }
